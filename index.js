@@ -1,6 +1,7 @@
 var request = require('request');
 var ct = require('console.table');
 var _ = require('lodash');
+let teams = require('./teams.json');
 
 let leagueId = 2743;
 
@@ -8,9 +9,9 @@ let baseUrl = "https://fantasy.premierleague.com/drf";
 let allDataUrl = "/bootstrap-static";
 let leagueUrl = "/leagues-classic-standings/";
 let players = '/elements';
+let fixtures = '/fixtures';
 
 let run = process.argv[2];
-let sortby = process.argv[3];
 
 let pf = Number.parseFloat;
 
@@ -30,7 +31,7 @@ let getLeague = () => {
   });
 };
 
-let getPlayers = () => {
+let getPlayers = (sortby) => {
   request(baseUrl + players, (err, res, body) => {
     let result = JSON.parse(body);
 
@@ -56,12 +57,37 @@ let getPlayers = () => {
   });
 };
 
+let getNextFixtures = (team, gw) => {
+  request(baseUrl + fixtures, (err, res, body) => {
+    let result = JSON.parse(body);
+
+    let teamId = _.find(teams, ['name', team]).id;
+
+    let nextFixtures = _.filter(result, (f) => { return f.event >= gw && f.event <= (gw + 10); });
+
+    let teamFixtures = nextFixtures.reduce((filtered, f) => {
+      if(f.team_a === teamId) {
+        filtered.push({ dif: f.team_a_difficulty, team: _.find(teams, ['id', f.team_h]) });
+      }
+      else if (f.team_h === teamId) {
+        filtered.push({ dif: f.team_h_difficulty, team: _.find(teams, ['id', f.team_a]) });
+      }
+      return filtered;
+    }, []);
+
+    console.log(teamFixtures);
+  });
+};
+
 switch(run) {
 case 'liga':
   getLeague();
   break;
 case 'top':
-  getPlayers();
+  getPlayers(process.argv[3]);
+  break;
+case 'team':
+  getNextFixtures(process.argv[3], pf(process.argv[4]));
   break;
 default:
   getLeague();
