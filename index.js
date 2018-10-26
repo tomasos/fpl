@@ -47,7 +47,12 @@ let getPlayers = sortby => {
         price: p.now_cost / 10,
         total: p.total_points,
         ictpp: pf(pf(p.ict_index) / p.now_cost).toFixed(2),
-        fpp: pf(pf(p.form) / (p.now_cost / 10)).toFixed(2)
+        fpp: pf(pf(p.form) / (p.now_cost / 10)).toFixed(2),
+        xPdiff:
+          (pf(p.form) + pf(p.points_per_game)) /
+          2 *
+          (100 - pf(p.selected_by_percent)) /
+          100
       };
     });
 
@@ -62,7 +67,7 @@ let getPlayers = sortby => {
 
 let nextTenFixtures = (fixtures, gw) => {
   return _.filter(fixtures, f => {
-    return f.event >= gw && f.event <= gw + 10;
+    return f.event >= gw && f.event < gw + 6;
   });
 };
 
@@ -107,6 +112,7 @@ let getEasiestFixtures = gw => {
 
     _.each(teams, t => {
       let teamFixtures = getTeamFixtures(nextFixtures, t.id);
+
       let mean = pf(_.meanBy(teamFixtures, "dif")).toFixed(2);
       meanDifficulty.push({ team: t.name, difficulty: mean });
     });
@@ -126,7 +132,7 @@ switch (run) {
     getNextFixtures(process.argv[3], pf(process.argv[4]));
     break;
   case "mean":
-    getEasiestFixtures(process.argv[3]);
+    getEasiestFixtures(pf(process.argv[3]));
     break;
   default:
     getLeague();
