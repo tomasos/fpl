@@ -2,18 +2,28 @@ var request = require("request");
 var ct = require("console.table");
 var _ = require("lodash");
 let teams = require("./teams.json");
+var fs = require('fs');
 
 let leagueId = 2743;
 
 let baseUrl = "https://fantasy.premierleague.com/drf";
 let allDataUrl = "/bootstrap-static";
 let leagueUrl = "/leagues-classic-standings/";
-let players = "/elements";
+let playersUrl = "/elements";
 let fixtures = "/fixtures";
+let playerDetailsUrl = "/element-summary/";
 
 let run = process.argv[2];
 
 let pf = Number.parseFloat;
+
+
+let positions = {
+  1: "GKP",
+  2: "DEF",
+  3: "MID",
+  4: "FWD"
+};
 
 let getLeague = () => {
   request(baseUrl + leagueUrl + leagueId, (err, res, body) => {
@@ -35,7 +45,7 @@ let getLeague = () => {
 };
 
 let getPlayers = sortby => {
-  request(baseUrl + players, (err, res, body) => {
+  request(baseUrl + playersUrl, (err, res, body) => {
     let result = JSON.parse(body);
 
     let p = result.map(p => {
@@ -48,18 +58,15 @@ let getPlayers = sortby => {
         total: p.total_points,
         ictpp: pf(pf(p.ict_index) / p.now_cost).toFixed(2),
         fpp: pf(pf(p.form) / (p.now_cost / 10)).toFixed(2),
+        ppgpm: pf(pf(p.points_per_game) / (p.now_cost / 10)).toFixed(2),
         xPdiff:
-          (pf(p.form) + pf(p.points_per_game)) /
+          pf((pf(p.form) + pf(p.points_per_game)) /
           2 *
           (100 - pf(p.selected_by_percent)) /
-          100
+             100).toFixed(2)
       };
     });
-
-    console.log("form");
-    console.table(_.take(_.reverse(_.sortBy(p, ["form"])), 100));
-
-    console.log("----");
+    
     console.log(sortby);
     console.table(_.take(_.reverse(_.sortBy(p, [sortby])), 100));
   });
@@ -121,6 +128,41 @@ let getEasiestFixtures = gw => {
   });
 };
 
+
+let buildStats = () => {
+  request(baseUrl + playersUrl, (err, res, body) => {
+    let result = JSON.parse(body);
+
+    let p = result.map(p => {
+      return {
+        navn: p.first_name + " " + p.second_name,
+        form: p.form,
+        ppg: pf(p.points_per_game),
+        ict: pf(p.ict_index),
+        price: p.now_cost,
+        total: p.total_points,
+        ictpp: pf(pf(p.ict_index) / p.now_cost).toFixed(2),
+        fpp: pf(pf(p.form) / (p.now_cost / 10)).toFixed(2),
+        ppgpm: pf(pf(p.points_per_game) / (p.now_cost / 10)).toFixed(2),
+        xPdiff:
+        pf((pf(p.form) + pf(p.points_per_game)) /
+           2 *
+           (100 - pf(p.selected_by_percent)) /
+           100).toFixed(2),
+        pos: p.element_type
+      };
+    });
+
+
+    fs.writeFile("players.json", JSON.stringify(p), () => {
+      console.log("write finished");
+    });
+    
+
+
+  });
+};
+
 switch (run) {
   case "liga":
     getLeague();
@@ -133,7 +175,10 @@ switch (run) {
     break;
   case "mean":
     getEasiestFixtures(pf(process.argv[3]));
-    break;
+  break;
+case "stats":
+  buildStats();
+  break;
   default:
     getLeague();
     break;
