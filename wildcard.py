@@ -53,9 +53,10 @@ xpdiff = df['xPdiff']
 ppgpm = df['ppgpm']
 fpp = df['fpp']
 ppg = df['ppg']
+xpfix = df['xPfix']
 
 df['selected'] = linprog(
-  -ppg,
+  -xpdiff,
   params,
   upper_bounds,
   bounds=bounds

@@ -1,8 +1,10 @@
 var request = require("request");
 var ct = require("console.table");
 var _ = require("lodash");
+var fs = require("fs");
+
 let teams = require("./teams.json");
-var fs = require('fs');
+let fixdif = require("./fixdif.json");
 
 let leagueId = 2743;
 
@@ -16,7 +18,6 @@ let playerDetailsUrl = "/element-summary/";
 let run = process.argv[2];
 
 let pf = Number.parseFloat;
-
 
 let positions = {
   1: "GKP",
@@ -59,14 +60,26 @@ let getPlayers = sortby => {
         ictpp: pf(pf(p.ict_index) / p.now_cost).toFixed(2),
         fpp: pf(pf(p.form) / (p.now_cost / 10)).toFixed(2),
         ppgpm: pf(pf(p.points_per_game) / (p.now_cost / 10)).toFixed(2),
-        xPdiff:
-          pf((pf(p.form) + pf(p.points_per_game)) /
-          2 *
-          (100 - pf(p.selected_by_percent)) /
-             100).toFixed(2)
+        xPdiff: pf(
+          (pf(p.form) + pf(p.points_per_game)) /
+            2 *
+            (100 - pf(p.selected_by_percent)) /
+            100
+        ).toFixed(2),
+        xPfix: pf(
+          (pf(p.form) + pf(p.points_per_game)) /
+            2 *
+            (5 -
+              pf(
+                _.find(fixdif, f => {
+                  return f.team.id === p.team;
+                }).difficulty
+              )) /
+            10
+        ).toFixed(2)
       };
     });
-    
+
     console.log(sortby);
     console.table(_.take(_.reverse(_.sortBy(p, [sortby])), 100));
   });
@@ -121,13 +134,24 @@ let getEasiestFixtures = gw => {
       let teamFixtures = getTeamFixtures(nextFixtures, t.id);
 
       let mean = pf(_.meanBy(teamFixtures, "dif")).toFixed(2);
-      meanDifficulty.push({ team: t.name, difficulty: mean });
+      meanDifficulty.push({ team: t, difficulty: mean });
     });
 
-    console.table(_.sortBy(meanDifficulty, ["difficulty"]));
+    fs.writeFile("fixdif.json", JSON.stringify(meanDifficulty), () => {
+      console.log("write finished");
+    });
+
+    console.table(
+      _.sortBy(
+        meanDifficulty.map(d => ({
+          team: d.team.name,
+          difficulty: d.difficulty
+        })),
+        ["difficulty"]
+      )
+    );
   });
 };
-
 
 let buildStats = () => {
   request(baseUrl + playersUrl, (err, res, body) => {
@@ -144,22 +168,30 @@ let buildStats = () => {
         ictpp: pf(pf(p.ict_index) / p.now_cost).toFixed(2),
         fpp: pf(pf(p.form) / (p.now_cost / 10)).toFixed(2),
         ppgpm: pf(pf(p.points_per_game) / (p.now_cost / 10)).toFixed(2),
-        xPdiff:
-        pf((pf(p.form) + pf(p.points_per_game)) /
-           2 *
-           (100 - pf(p.selected_by_percent)) /
-           100).toFixed(2),
+        xPdiff: pf(
+          (pf(p.form) + pf(p.points_per_game)) /
+            2 *
+            (100 - pf(p.selected_by_percent)) /
+            100
+        ).toFixed(2),
+        xPfix: pf(
+          (pf(p.form) + pf(p.points_per_game)) /
+            2 *
+            (5 -
+              pf(
+                _.find(fixdif, f => {
+                  return f.team.id === p.team;
+                }).difficulty
+              )) /
+            10
+        ).toFixed(2),
         pos: p.element_type
       };
     });
 
-
     fs.writeFile("players.json", JSON.stringify(p), () => {
       console.log("write finished");
     });
-    
-
-
   });
 };
 
@@ -175,10 +207,10 @@ switch (run) {
     break;
   case "mean":
     getEasiestFixtures(pf(process.argv[3]));
-  break;
-case "stats":
-  buildStats();
-  break;
+    break;
+  case "stats":
+    buildStats();
+    break;
   default:
     getLeague();
     break;
