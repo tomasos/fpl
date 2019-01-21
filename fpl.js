@@ -27,9 +27,10 @@ let positions = {
 };
 
 let getLeague = () => {
+  let standings = [];
   request(baseUrl + leagueUrl + leagueId, (err, res, body) => {
     let result = JSON.parse(body);
-    let league = result.standings.results.map(t => {
+    let res1 = result.standings.results.map(t => {
       return {
         lag: t.entry_name,
         navn: t.player_name,
@@ -37,11 +38,31 @@ let getLeague = () => {
         gw: t.event_total
       };
     });
-    console.table(league);
 
-    console.log("---");
+    request(
+      baseUrl + leagueUrl + leagueId + "?phase=1&le-page=1&ls-page=2",
+      (err, res, body) => {
+        let result = JSON.parse(body);
+        let res2 = result.standings.results.map(t => {
+          return {
+            lag: t.entry_name,
+            navn: t.player_name,
+            total: t.total,
+            gw: t.event_total
+          };
+        });
 
-    console.table(_.reverse(_.sortBy(league, ["gw"])));
+        standings = res1.concat(res2);
+
+        console.table(standings);
+
+        console.log("---");
+
+        console.table(_.reverse(_.sortBy(standings, ["gw"])));
+
+        console.log("snitt: ", _.meanBy(standings, "gw"));
+      }
+    );
   });
 };
 
@@ -195,6 +216,27 @@ let buildStats = () => {
   });
 };
 
+let aq = () => {
+  request(
+    "https://api.met.no/weatherapi/airqualityforecast/0.1/?station=NO0059A&reftime=2018-11-21T12:00:00Z",
+    (err, res, body) => {
+      let result = JSON.parse(body);
+
+      let aqmap = result.data.time.map(d => {
+        return {
+          tid: new Date(d.from).toString(),
+          NO2: pf(d.variables.no2_concentration.value).toFixed(2),
+          PM25: pf(d.variables.pm25_concentration.value).toFixed(2),
+          PM10: pf(d.variables.pm10_concentration.value).toFixed(2),
+          AQI: pf(d.variables.AQI.value).toFixed(2)
+        };
+      });
+
+      console.table(aqmap);
+    }
+  );
+};
+
 switch (run) {
   case "liga":
     getLeague();
@@ -210,6 +252,9 @@ switch (run) {
     break;
   case "stats":
     buildStats();
+    break;
+  case "luft":
+    aq();
     break;
   default:
     getLeague();
