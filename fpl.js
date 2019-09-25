@@ -8,7 +8,7 @@ let fixdif = require("./fixdif.json");
 
 let leagueId = 2743;
 
-let baseUrl = "https://fantasy.premierleague.com/drf";
+let baseUrl = "https://fantasy.premierleague.com/api";
 let allDataUrl = "/bootstrap-static";
 let leagueUrl = "/leagues-classic-standings/";
 let playersUrl = "/elements";
@@ -174,41 +174,47 @@ let getEasiestFixtures = gw => {
   });
 };
 
+let extractStats = result => {
+  return result.map(p => {
+    return {
+      navn: p.first_name + " " + p.second_name,
+      team: _.find(teams, ["id", p.team]).name,
+      teamid: p.team,
+      form: p.form,
+      ppg: pf(p.points_per_game),
+      ict: pf(p.ict_index),
+      price: p.now_cost,
+      total: p.total_points,
+      ictpp: pf(pf(p.ict_index) / p.now_cost).toFixed(2),
+      fpp: pf(pf(p.form) / (p.now_cost / 10)).toFixed(2),
+      ppgpm: pf(pf(p.points_per_game) / (p.now_cost / 10)).toFixed(2),
+      xPdiff: pf(
+        (pf(p.form) + pf(p.points_per_game)) /
+          2 *
+          (100 - pf(p.selected_by_percent)) /
+          100
+      ).toFixed(2),
+      xPfix: pf(
+        (pf(p.form) + pf(p.points_per_game)) /
+          2 *
+          (5 -
+            pf(
+              _.find(fixdif, f => {
+                return f.team.id === p.team;
+              }).difficulty
+            )) /
+          10
+      ).toFixed(2),
+      pos: p.element_type
+    };
+  });
+};
+
 let buildStats = () => {
   request(baseUrl + playersUrl, (err, res, body) => {
     let result = JSON.parse(body);
 
-    let p = result.map(p => {
-      return {
-        navn: p.first_name + " " + p.second_name,
-        form: p.form,
-        ppg: pf(p.points_per_game),
-        ict: pf(p.ict_index),
-        price: p.now_cost,
-        total: p.total_points,
-        ictpp: pf(pf(p.ict_index) / p.now_cost).toFixed(2),
-        fpp: pf(pf(p.form) / (p.now_cost / 10)).toFixed(2),
-        ppgpm: pf(pf(p.points_per_game) / (p.now_cost / 10)).toFixed(2),
-        xPdiff: pf(
-          (pf(p.form) + pf(p.points_per_game)) /
-            2 *
-            (100 - pf(p.selected_by_percent)) /
-            100
-        ).toFixed(2),
-        xPfix: pf(
-          (pf(p.form) + pf(p.points_per_game)) /
-            2 *
-            (5 -
-              pf(
-                _.find(fixdif, f => {
-                  return f.team.id === p.team;
-                }).difficulty
-              )) /
-            10
-        ).toFixed(2),
-        pos: p.element_type
-      };
-    });
+    let p = extractStats(result);
 
     fs.writeFile("players.json", JSON.stringify(p), () => {
       console.log("write finished");
@@ -216,25 +222,40 @@ let buildStats = () => {
   });
 };
 
-let aq = () => {
-  request(
-    "https://api.met.no/weatherapi/airqualityforecast/0.1/?station=NO0059A&reftime=2018-11-21T12:00:00Z",
-    (err, res, body) => {
-      let result = JSON.parse(body);
+let buildBaseStats = () => {
+  request(baseUrl + allDataUrl, (err, res, body) => {
+    let result = JSON.parse(body);
 
-      let aqmap = result.data.time.map(d => {
-        return {
-          tid: new Date(d.from).toString(),
-          NO2: pf(d.variables.no2_concentration.value).toFixed(2),
-          PM25: pf(d.variables.pm25_concentration.value).toFixed(2),
-          PM10: pf(d.variables.pm10_concentration.value).toFixed(2),
-          AQI: pf(d.variables.AQI.value).toFixed(2)
-        };
-      });
+    let p = extractStats(result.elements);
 
-      console.table(aqmap);
-    }
-  );
+    fs.writeFile("basestats.json", JSON.stringify(p), () => {
+      console.log("write finished");
+    });
+  });
+};
+
+let buildTeamsFile = () => {
+  request(baseUrl + allDataUrl, (err, res, body) => {
+    let result = JSON.parse(body);
+
+    fs.writeFile("teams.json", JSON.stringify(result.teams), () => {
+      console.log("write finished");
+    });
+  });
+};
+
+let teamStats = () => {
+  let teams = [2, 15, 4, 11, 19, 10, 9, 12, 8, 6];
+  request(baseUrl + playersUrl, (err, res, body) => {
+    let result = JSON.parse(body);
+    let players = result.filter(player => teams.indexOf(player.team) > -1);
+
+    let p = extractStats(players);
+
+    fs.writeFile("players.json", JSON.stringify(p), () => {
+      console.log("write finished");
+    });
+  });
 };
 
 switch (run) {
@@ -253,8 +274,14 @@ switch (run) {
   case "stats":
     buildStats();
     break;
-  case "luft":
-    aq();
+  case "basestats":
+    buildBaseStats();
+    break;
+  case "tstats":
+    teamStats();
+    break;
+  case "maketeams":
+    buildTeamsFile();
     break;
   default:
     getLeague();

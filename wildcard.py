@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import linprog
 
-df = pd.read_json('players.json', orient = 'columns');
+df = pd.read_json('basestats.json', orient = 'columns');
 
 
 
@@ -16,6 +16,8 @@ df['midfielder'] = df['pos'].map(lambda x: 1 if x == 3 else 0)
 df['forward'] = df['pos'].map(lambda x: 1 if x == 4 else 0)
 df['position'] = df['pos'].map(lambda x: ['keeper', 'defender', 'midfielder', 'forward'][x-1])
 
+df['liverpool'] = df['teamid'].map(lambda x: 1 if x == 10 else 0)
+df['chelsea'] = df['teamid'].map(lambda x: 1 if x == 6 else 0)
 
 #df.plot(x='ppg', y='price', kind='scatter')
 #plt.show()
@@ -25,7 +27,8 @@ keepers = df['keeper']
 defenders = df['defender']
 midfielders = df['midfielder']
 forwards = df['forward']
-
+team = df['liverpool']
+team2 = df['chelsea']
 players = np.ones(len(df))
 
 params = np.array([
@@ -34,16 +37,20 @@ params = np.array([
   defenders,
   midfielders,
   forwards,
-  players,
+    players,
+    team,
+    team2
 ])
 
 upper_bounds = np.array([
-  1010, # max cost
-  2,    # max keepers
-  5,    # max defenders
-  5,    # max midfielders
-  3,    # max fowards
-  15,   # max players
+    1000, # max cost
+    2,    # max keepers
+    5,    # max defenders
+    5,    # max midfielders
+    3,    # max fowards
+    15,    # max players
+    3,
+    3
 ])
 
 bounds = [(0, 1) for x in range(len(df))]
@@ -75,8 +82,8 @@ print("points: %.2f" %  (df['selected'] * df['total']).sum())
 print("checking: %s" % check)
 
 print(df.loc[df['selected'] != 0] \
-   [['navn', 'position', 'price', 'total', 'selected']] \
-   .sort_values(by=['total'], ascending=False))
+   [['navn', 'team', 'position', 'price', 'total', 'selected']] \
+   .sort_values(by=['position'], ascending=False))
 
 
 
